@@ -1,0 +1,59 @@
+type Person {
+    id: String!
+    name: String!
+    surname: String!
+    patronymic: String!
+    nation: String!
+    gender: String!
+    age: Int!
+}
+
+type Query {
+  GetAllPersons: [Person!]!
+  CollectPersons(limit: Int, offset: Int, filter: CollectPersonsFilter): [Person!]
+  FindById(PersonId: String!): Person
+}
+
+input CreatePersonInput {
+  name: String!
+  surname: String!
+  patronymic: String!
+}
+
+type CreatePersonResponse {
+  success: Boolean!
+  personId: String!
+}
+
+input CollectPersonsFilter {
+  olderThan: Int
+  youngerThan: Int
+	gender: String
+	nations: [String!]
+}
+
+
+input UpdatePersonInput {
+  personId: String!
+  newNation: String
+  newGender: String
+  newAge: Int
+}
+
+type UpdatePersonResponse {
+  success: Boolean!
+}
+
+input DeletePersonInput {
+  personId: String!
+}
+
+type DeletePersonResponse {
+  success: Boolean!
+}
+
+type Mutation {
+  CreatePerson(input: CreatePersonInput!): CreatePersonResponse!
+  UpdatePerson(input: UpdatePersonInput!): UpdatePersonResponse!
+  DeletePerson(input: DeletePersonInput!): DeletePersonResponse!
+}

@@ -1,0 +1,14 @@
+# files
+Makefile
+Dockerfile
+.dockerignore
+*.md
+*.env
+*.cover
+gqlgen.yml
+
+# dirs
+/test
+/.github
+/deployments
+/migrations
