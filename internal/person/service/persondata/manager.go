@@ -63,15 +63,15 @@ func Manager(r repo, metaData metaDataProvider) (*manager, error) {
 func (m *manager) CreateFrom(ctx context.Context, fio model.FIO) (string, error) {
 	age, err := m.metaDataProvider.AgeByName(ctx, fio.Name)
 	if err != nil {
-		return "", fmt.Errorf("persondata.Manager.CreateFrom: %w", err)
+		return "", fmt.Errorf("PersonManager.CreateFrom: %w", err)
 	}
 	gender, err := m.metaDataProvider.GenderByName(ctx, fio.Name)
 	if err != nil {
-		return "", fmt.Errorf("persondata.Manager.CreateFrom: %w", err)
+		return "", fmt.Errorf("PersonManager.CreateFrom: %w", err)
 	}
 	nation, err := m.metaDataProvider.NationByName(ctx, fio.Name)
 	if err != nil {
-		return "", fmt.Errorf("persondata.Manager.CreateFrom: %w", err)
+		return "", fmt.Errorf("PersonManager.CreateFrom: %w", err)
 	}
 
 	person := model.NewPerson(fio, model.PersonalMetaData{
@@ -81,7 +81,7 @@ func (m *manager) CreateFrom(ctx context.Context, fio model.FIO) (string, error)
 	})
 
 	if err = m.repo.Save(ctx, person); err != nil {
-		return "", fmt.Errorf("persondata.Manager.CreateFrom: %w", err)
+		return "", fmt.Errorf("PersonManager.CreateFrom: %w", err)
 	}
 	return person.Id, nil
 }
