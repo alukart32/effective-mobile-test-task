@@ -204,26 +204,29 @@ func (p *pgxDB) getCollectQuery(limit, offset int, filter model.PersonFilter) (s
 	sb.WriteString("SELECT p.id, p.name, p.surname, p.patronymic, p.nation, p.gender, p.age")
 	sb.WriteString(" FROM persons AS p")
 
-	if limit > 0 || offset > 0 {
+	if limit > 0 {
+		if offset > 0 {
 			sb.WriteString(" JOIN (SELECT id FROM persons ")
+			if !filter.IsEmpty() {
 				addFilters()
+			}
 			sb.WriteString(" ORDER BY id")
-
-		if limit > 0 && offset > 0 {
 			sb.WriteString(fmt.Sprintf(" LIMIT $%d OFFSET $%d", fieldOrder+1, fieldOrder+2))
 			args = append(args, limit, offset)
 			fieldOrder += 2
-		} else if limit > 0 {
+
+			sb.WriteString(" ) as tmp ON tmp.id = p.id")
+		} else {
+			if !filter.IsEmpty() {
+				addFilters()
+			}
 			fieldOrder++
 			sb.WriteString(fmt.Sprintf(" LIMIT $%d", fieldOrder))
 			args = append(args, limit)
 		}
-
-		sb.WriteString(" ) as tmp ON tmp.id = p.id")
-	} else {
+	} else if !filter.IsEmpty() {
 		addFilters()
 	}
-
 	return sb.String(), args
 }
 
