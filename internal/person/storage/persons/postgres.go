@@ -356,8 +356,8 @@ func (s *cachedStorage) Save(ctx context.Context, person model.Person) error {
 
 	var err error
 	if err = s.db.Save(ctx, person); err != nil {
-		if err = s.cache.HDel(ctx, "person:"+person.Id).Err(); err != nil {
-			err = fmt.Errorf("redis: %w", err)
+		if cacheErr := s.cache.Del(ctx, "person:"+person.Id).Err(); cacheErr != nil {
+			return fmt.Errorf("redis: %w", cacheErr)
 		}
 	}
 	return err
@@ -378,12 +378,23 @@ func (s *cachedStorage) FindById(ctx context.Context, id string) (model.Person, 
 		if err != nil {
 			return model.Person{}, err
 		}
-		err = s.cache.HSet(ctx, id, toRecord(p), 0).Err()
-		return p, err
+		if _, err = s.cache.Pipelined(ctx, func(rdb redis.Pipeliner) error {
+			key := "person:" + p.Id
+			rdb.HSet(ctx, key, "id", p.Id)
+			rdb.HSet(ctx, key, "name", p.Name)
+			rdb.HSet(ctx, key, "surname", p.Surname)
+			rdb.HSet(ctx, key, "patronymic", p.Patronymic)
+			rdb.HSet(ctx, key, "nation", p.Nation)
+			rdb.HSet(ctx, key, "gender", p.Gender)
+			rdb.HSet(ctx, key, "age", p.Age)
+			return nil
+		}); err != nil {
+			return model.Person{}, err
+		}
+		return p, nil
 	}
-	log.Println(record)
 
-	return record.ToModel(), err
+	return record.ToModel(), nil
 }
 
 func (s *cachedStorage) Update(ctx context.Context, id string, meta model.PersonalMetaData) error {
