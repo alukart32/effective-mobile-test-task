@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 	"sync"
 
@@ -20,18 +19,13 @@ type pgxDB struct {
 	pool *pgxpool.Pool
 }
 
-func (p *pgxDB) Save(ctx context.Context, person model.Person) error {
-	var (
-		tx  pgx.Tx
-		err error
-	)
+func (p *pgxDB) Save(ctx context.Context, person model.Person) (err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("pgxDB.Save: %w", err)
 		}
 	}()
-
-	tx, err = p.pool.BeginTx(ctx, pgx.TxOptions{
+	tx, err := p.pool.BeginTx(ctx, pgx.TxOptions{
 		IsoLevel:       pgx.RepeatableRead,
 		AccessMode:     pgx.ReadWrite,
 		DeferrableMode: pgx.NotDeferrable,
@@ -61,24 +55,17 @@ func (p *pgxDB) Save(ctx context.Context, person model.Person) error {
 	if err != nil && errors.As(err, &pgErr) {
 		if pgerrcode.IsIntegrityConstraintViolation(pgErr.SQLState()) &&
 			pgErr.SQLState() == pgerrcode.UniqueViolation {
-			err = fmt.Errorf("%s unique violation", pgErr.ColumnName)
+			err = fmt.Errorf("pgxDB.Save: %s unique violation", pgErr.ColumnName)
 		}
 		if pgerrcode.IsIntegrityConstraintViolation(pgErr.SQLState()) &&
 			pgErr.SQLState() == pgerrcode.CheckViolation {
-			err = fmt.Errorf("%s check violation", pgErr.ColumnName)
+			err = fmt.Errorf("pgxDB.Save: %s check violation", pgErr.ColumnName)
 		}
 	}
 	return err
 }
 
-func (p *pgxDB) FindById(ctx context.Context, id string) (model.Person, error) {
-	var err error
-	defer func() {
-		if err != nil {
-			err = fmt.Errorf("pgxDB.FindById: %w", err)
-		}
-	}()
-
+func (p *pgxDB) FindById(ctx context.Context, id string) (_ model.Person, err error) {
 	const query = `SELECT * FROM persons WHERE id = $1`
 	var record record
 	row := p.pool.QueryRow(ctx, query, id)
@@ -95,23 +82,19 @@ func (p *pgxDB) FindById(ctx context.Context, id string) (model.Person, error) {
 		if errors.Is(err, pgx.ErrNoRows) {
 			err = nil
 		}
-		return model.Person{}, err
+		return model.Person{}, fmt.Errorf("pgxDB.FindById: %w", err)
 	}
 	return record.ToModel(), nil
 }
 
-func (p *pgxDB) Collect(ctx context.Context, filter model.PersonFilter, limit, offset int) ([]model.Person, error) {
-	var (
-		tx  pgx.Tx
-		err error
-	)
+func (p *pgxDB) Collect(ctx context.Context, filter model.PersonFilter, limit, offset int) (_ []model.Person, err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("pgxDB.Collect: %w", err)
 		}
 	}()
 
-	tx, err = p.pool.BeginTx(ctx, pgx.TxOptions{
+	tx, err := p.pool.BeginTx(ctx, pgx.TxOptions{
 		IsoLevel:       pgx.RepeatableRead,
 		AccessMode:     pgx.ReadWrite,
 		DeferrableMode: pgx.NotDeferrable,
@@ -119,8 +102,8 @@ func (p *pgxDB) Collect(ctx context.Context, filter model.PersonFilter, limit, o
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		err = p.finishTx(ctx, tx, err)
+	defer func() error {
+		return p.finishTx(ctx, tx, err)
 	}()
 
 	query, args := p.getCollectQuery(limit, offset, filter)
@@ -222,9 +205,9 @@ func (p *pgxDB) getCollectQuery(limit, offset int, filter model.PersonFilter) (s
 	sb.WriteString(" FROM persons AS p")
 
 	if limit > 0 || offset > 0 {
-		sb.WriteString(" JOIN (SELECT id FROM persons ")
-		addFilters()
-		sb.WriteString(" ORDER BY id")
+			sb.WriteString(" JOIN (SELECT id FROM persons ")
+				addFilters()
+			sb.WriteString(" ORDER BY id")
 
 		if limit > 0 && offset > 0 {
 			sb.WriteString(fmt.Sprintf(" LIMIT $%d OFFSET $%d", fieldOrder+1, fieldOrder+2))
@@ -244,8 +227,7 @@ func (p *pgxDB) getCollectQuery(limit, offset int, filter model.PersonFilter) (s
 	return sb.String(), args
 }
 
-func (p *pgxDB) Update(ctx context.Context, id string, meta model.PersonalMetaData) error {
-	var err error
+func (p *pgxDB) Update(ctx context.Context, id string, meta model.PersonalMetaData) (err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("pgxDB.Update: %w", err)
@@ -305,9 +287,9 @@ func (p *pgxDB) getUpdateQuery(id string, meta model.PersonalMetaData) (string, 
 	return sb.String(), args
 }
 
-func (p *pgxDB) Delete(ctx context.Context, id string) error {
+func (p *pgxDB) Delete(ctx context.Context, id string) (err error) {
 	const query = `DELETE FROM persons WHERE id = $1`
-	_, err := p.pool.Exec(ctx, query, id)
+	_, err = p.pool.Exec(ctx, query, id)
 	if err != nil {
 		err = fmt.Errorf("pgxDB.Delete: %w", err)
 	}
