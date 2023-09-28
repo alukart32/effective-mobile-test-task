@@ -33,8 +33,12 @@ func (m fioMsg) String() string {
 }
 
 type fioErrorMsg struct {
-	fioMsg
-	err error
+	Msg fioMsg
+	Err string
+}
+
+func (f fioErrorMsg) MarshalZerologObject(e *zerolog.Event) {
+	e.Object("fio", f.Msg).Str("err", f.Err)
 }
 
 type kafkaFIO struct {
@@ -109,13 +113,13 @@ func (h *kafkaFIO) Handle(ctx context.Context) {
 
 			fio, err := model.NewFIO(msg.Name, msg.Surname, msg.Patronymic)
 			if err != nil {
-				h.errors <- fioErrorMsg{fioMsg: msg, err: err}
+				h.errors <- fioErrorMsg{Msg: msg, Err: err.Error()}
 				continue
 			}
 
 			_, err = h.personCreator.CreateFrom(ctx, fio)
 			if err != nil {
-				h.errors <- fioErrorMsg{fioMsg: msg, err: err}
+				h.errors <- fioErrorMsg{Msg: msg, Err: err.Error()}
 			}
 		}
 	}
@@ -158,7 +162,7 @@ func (h *kafkaFIO) Fetch(ctx context.Context) {
 		var msg fioMsg
 		if err := json.Unmarshal(m.Value, &msg); err != nil {
 			logger.Err(err).Send()
-			h.errors <- fioErrorMsg{err: err}
+			h.errors <- fioErrorMsg{Err: err.Error()}
 		} else {
 			h.msgs <- msg
 		}
@@ -187,8 +191,9 @@ func (h *kafkaFIO) RespondError(ctx context.Context) {
 				return
 			}
 			logger.Info().
+				Str("op", "send msg").
 				Object("msg", msg).
-				Msg("send msg")
+				Send()
 
 			var (
 				b   []byte
